@@ -1,0 +1,10 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "review-brief",
+  "description": "Generates a standalone HTML briefing for a set of code changes (local edits, branches, GitHub/Azure DevOps PRs, patches, or folder snapshots) with hotspots, review notes, before/after diagrams, and key code highlights.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Brandon Pasquarelli"
+  },
+  "keywords": ["code-review", "diff", "pull-request", "visualization"]
+}

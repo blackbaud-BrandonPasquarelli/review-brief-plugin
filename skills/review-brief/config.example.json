@@ -1,0 +1,252 @@
+{
+  "title": "Checkout: discount codes and payment retries",
+  "overview": [
+    "Adds optional discount codes to checkout; the response now returns subtotal, discount and total.",
+    "Contract: discountCode added to the request; subtotal and discount added to the response."
+  ],
+  "areas": [
+    {
+      "name": "Checkout logic",
+      "match": [
+        "src/services/**"
+      ]
+    },
+    {
+      "name": "Shared contracts & clients",
+      "match": [
+        "src/contracts/**",
+        "src/clients/**"
+      ]
+    },
+    {
+      "name": "API / Routes",
+      "match": [
+        "src/routes/**",
+        "/\\.routes\\.ts$/"
+      ]
+    },
+    {
+      "name": "Tests-only (fixture updates)",
+      "match": []
+    }
+  ],
+  "files": {
+    "src/contracts/order.contract.ts": "Adds optional discountCode to CheckoutRequest; CheckoutResponse gains subtotal and discount.",
+    "src/services/discount.service.ts": {
+      "desc": "New service: validates a code (expiry, minimum subtotal) and returns the discount amount.",
+      "tags": [
+        "new"
+      ]
+    },
+    "test/fixtures/orders.fixture.ts": {
+      "desc": "Fixture update only: adds subtotal and discount to mock responses.",
+      "area": "Tests-only (fixture updates)",
+      "kind": "test"
+    }
+  },
+  "notes": [
+    {
+      "severity": "risk",
+      "title": "Retry path has no tests",
+      "text": "PaymentClient.charge now retries with backoff, but no spec covers 5xx retry or the final failure.",
+      "files": [
+        "src/clients/payment.client.ts"
+      ]
+    },
+    {
+      "severity": "discrepancy",
+      "title": "Stated context vs code",
+      "text": "Ticket says codes come from the promotions database; code uses a hard-coded rules table."
+    },
+    {
+      "severity": "warn",
+      "title": "Leftover code",
+      "text": "Commented-out debug logging left in checkout.service.ts."
+    },
+    {
+      "severity": "info",
+      "title": "Shared error type",
+      "text": "InvalidDiscountError lives in src/errors.ts alongside the other domain errors."
+    }
+  ],
+  "diagrams": [
+    {
+      "title": "Checkout flow — before",
+      "wide": true,
+      "mermaid": [
+        "flowchart LR",
+        "  C[\"CheckoutService\"] --> P[\"PaymentClient<br/>single attempt\"]:::gone",
+        "  P --> X[(\"Payments API\")]",
+        "  classDef gone fill:#ffebe9,stroke:#cf222e"
+      ]
+    },
+    {
+      "title": "Checkout flow — after",
+      "wide": true,
+      "mermaid": [
+        "flowchart LR",
+        "  C[\"CheckoutService\"] -- \"calculate()\" --> D[\"DiscountService\"]:::new",
+        "  C -- \"charge(orderId)\" --> P[\"PaymentClient<br/>retry x3 + idempotency key\"]:::new",
+        "  P --> X[(\"Payments API\")]",
+        "  classDef new fill:#e6ffec,stroke:#2da44e"
+      ]
+    },
+    {
+      "title": "Request flow — after",
+      "caption": "Endpoint → route → service → repo/external. Tint new nodes green.",
+      "mermaid": [
+        "flowchart LR",
+        "  R[\"checkoutRouter<br/>POST /api/checkout\"] --> S[\"CheckoutService\"]",
+        "  S --> D[\"DiscountService\"]:::new",
+        "  S --> DB[(\"Orders DB\")]",
+        "  S --> G[\"Payments API\"]",
+        "  classDef new fill:#e6ffec,stroke:#2da44e"
+      ]
+    },
+    {
+      "title": "Contract shape — after",
+      "mermaid": [
+        "classDiagram",
+        "  class CheckoutRequest {",
+        "    +string cartId",
+        "    +string discountCode",
+        "  }",
+        "  class CheckoutResponse {",
+        "    +string orderId",
+        "    +number subtotal",
+        "    +number discount",
+        "    +number total",
+        "  }",
+        "  CheckoutRequest ..> CheckoutResponse"
+      ]
+    }
+  ],
+  "highlights": [
+    {
+      "title": "New contracts",
+      "file": "src/contracts/order.contract.ts",
+      "lang": "ts",
+      "note": "Whole file when no markers are given."
+    },
+    {
+      "title": "Checkout applies the discount before charging",
+      "file": "src/services/checkout.service.ts",
+      "start": "public async checkout(",
+      "end": "\n  }",
+      "lang": "ts"
+    },
+    {
+      "title": "Old single-attempt charge (before side)",
+      "file": "src/clients/payment.client.ts",
+      "side": "before",
+      "start": "public async charge(",
+      "end": "\n  }"
+    },
+    {
+      "title": "Discount core logic (multiple snippets joined by …)",
+      "file": "src/services/discount.service.ts",
+      "parts": [
+        {
+          "start": "const RULES",
+          "end": ";"
+        },
+        {
+          "start": "public calculate(",
+          "end": "\n  }"
+        }
+      ]
+    },
+    {
+      "title": "Literal snippet",
+      "file": "src/clients/payment.limits.ts",
+      "code": "export const MAX_CHARGE_ATTEMPTS = 3;\nexport const RETRY_BACKOFF_MS = 200;",
+      "lang": "ts"
+    }
+  ],
+  "hotspots": [
+    {
+      "title": "Contract change: discount fields added",
+      "level": "high",
+      "why": "Wire-contract change shared with UI clients; client and API must agree on field names and nullability.",
+      "check": [
+        "Do field names/casing match what the UI clients expect?",
+        "Can discount be null when no code is supplied? It is typed non-optional."
+      ],
+      "files": [
+        "src/contracts/order.contract.ts",
+        "test/fixtures/orders.fixture.ts"
+      ],
+      "file": "src/contracts/order.contract.ts",
+      "start": "export interface CheckoutResponse",
+      "end": "}"
+    },
+    {
+      "title": "Payment retry loop",
+      "level": "medium",
+      "why": "Charging in a loop: a wrong retry condition or missing idempotency key could double-charge a customer.",
+      "check": [
+        "Does every attempt send the same idempotency key?"
+      ],
+      "file": "src/clients/payment.client.ts"
+    }
+  ],
+  "readingPath": [
+    {
+      "title": "Contracts & limits",
+      "why": "The new data shapes and caps every other file relies on.",
+      "files": [
+        "src/contracts/*.contract.ts",
+        "src/clients/payment.limits.ts",
+        "src/errors.ts"
+      ]
+    },
+    {
+      "title": "Services",
+      "why": "Each service owns one step; read the discount rules, then checkout.",
+      "files": [
+        "src/services/discount.service.ts",
+        "src/services/checkout.service.ts"
+      ]
+    },
+    {
+      "title": "Route and client wiring",
+      "why": "How requests reach the services and how charges are retried.",
+      "files": [
+        "src/routes/checkout.routes.ts",
+        "src/clients/payment.client.ts"
+      ]
+    }
+  ],
+  "walkthrough": {
+    "intro": "One or two sentences on the **goal** of the change.",
+    "outro": "Optional: what was left out, or mechanical changes not worth a step.",
+    "steps": [
+      {
+        "title": "Where the request enters",
+        "file": "src/contracts/order.contract.ts",
+        "find": "text on a diff line",
+        "to": "inclusive end text",
+        "text": "What changed here and why it matters."
+      },
+      {
+        "title": "A replaced line",
+        "file": "src/services/discount.service.ts",
+        "lines": "40-42",
+        "text": "Line ranges also highlight the old line a new line replaced."
+      },
+      {
+        "title": "Ripple changes",
+        "text": "A text-only step: summarise mechanical changes such as `signature` updates."
+      },
+      {
+        "title": "How it is tested",
+        "file": "test/checkout.service.spec.ts",
+        "hunk": 1,
+        "text": [
+          "Hunk 1 of this file.",
+          "Paragraphs are separated like this."
+        ]
+      }
+    ]
+  }
+}

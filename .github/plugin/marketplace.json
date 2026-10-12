@@ -1,0 +1,8 @@
+{
+  "name": "review-brief",
+  "owner": { "name": "Brandon Pasquarelli" },
+  "metadata": { "description": "Review brief plugin", "version": "1.0.0" },
+  "plugins": [
+    { "name": "review-brief", "description": "Visual HTML brief of code changes", "version": "1.0.0", "source": "." }
+  ]
+}
