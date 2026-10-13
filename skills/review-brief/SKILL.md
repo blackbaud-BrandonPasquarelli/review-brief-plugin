@@ -23,12 +23,16 @@ has a `🧱 n.m` chip and a "next →" link) · ✨ Highlights. The URL hash tra
 links, Back, and reload all work.
 
 Walkthrough, Reading path and Files use a split view: ordered cards on the left, and the selected file on the right.
+Drag the divider between them (or focus it and use ←/→) to resize; double-click resets it. The width is shared by
+all tabs and remembered.
 The right pane shows **Changes** (a unified diff) by default. A toggle switches to **Full file**, which shows
-the whole head file with changes marked and scrolls to the first change. The chosen view is remembered.
+the whole head file with changes marked and scrolls to the first change. A second toggle switches either view
+between **Unified** and **Split** (side-by-side: removed lines on the left, added lines on the right). Both
+choices are remembered.
 Full file is available for modified/renamed text files from local, GitHub and ADO sources (capped by
 `--max-full-files`, default 300, and 5000 lines per file). It is not available for patch-file sources; new and
 deleted files already show everything under Changes. Keys: `j`/`k` next/previous file, `f` toggle the view,
-`n` next unreviewed file (game mode). Below 1000px wide the split stacks vertically. `--no-diffs` drops the
+`s` toggle unified/split, `n` next unreviewed file (game mode). Below 1000px wide the split stacks vertically. `--no-diffs` drops the
 diff pane for a small page with no code in it.
 
 Each rendered diagram has a **⤢ Expand** button (clicking the diagram also works). It opens a near-fullscreen
@@ -41,7 +45,9 @@ the level of individual changes, not files: "the request enters here → is vali
 because…". Each step has a title, a short explanation, and optionally an anchor to specific lines. Selecting a
 step opens that file on the right with the referenced lines highlighted (purple bar), in both Changes and Full
 file, and scrolls to them. Text-only steps (no file) carry narrative and are skipped by `j`/`k`. The Summary
-tab links to it ("New to this change? Take the guided walkthrough"), and `#w-N` links to a step.
+tab links to it ("New to this change? Take the guided walkthrough"), and `#w-N` links to a step. A
+**⧉ Copy steps** button on the heading copies every step's numbered title and explanation as plain text, with no
+code or diff.
 
 Reading path: a building-block order for every file, for large PRs where the starting point is unclear.
 By default it is computed from cross-file references (symbols each file defines and uses, plus relative
