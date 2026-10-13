@@ -905,21 +905,42 @@ function flash(el){if(!el)return;el.classList.remove('flash');void el.offsetWidt
 const setHH=()=>B.style.setProperty('--hh',H.offsetHeight+'px');
 addEventListener('resize',setHH);
 const tabs=[...document.querySelectorAll('section.tab')];
-let cur=null,mode='d';
-try{if(localStorage.getItem('cvz:view')==='f')mode='f'}catch(e){}
+let cur=null,mode='d',lay='u';
+try{if(localStorage.getItem('cvz:view')==='f')mode='f';if(localStorage.getItem('cvz:layout')==='s')lay='s'}catch(e){}
 const rows=sp=>[...sp.querySelectorAll('.list [data-fi]')].filter(r=>!r.classList.contains('hidden'));
 function pos(p){const sp=p.closest('.split'),r=sp.querySelector('.list .sel'),rs=rows(sp),i=r?rs.indexOf(r):-1,nb=p.querySelectorAll('.ptool button[data-nav]');
 p.querySelector('.ppos').textContent=i<0?'':(i+1)+' / '+rs.length;nb[0].disabled=i<=0;nb[1].disabled=!rs.length||i>=rs.length-1}
-function toFirst(p,win){if(!p.offsetParent)return;const v=(mode==='f'&&p.querySelector('.vf'))||p.querySelector('.vd')||p,c=v.querySelector('tr.wt')||(mode==='f'&&p.querySelector('.vf tr.ad,.vf tr.dl'));if(!c)return;if(p.scrollHeight>p.clientHeight){p.scrollTop+=c.getBoundingClientRect().top-p.getBoundingClientRect().top-p.querySelector('.ptool').offsetHeight-60;return}if(!win)return;const y=c.getBoundingClientRect().top;if(y<H.offsetHeight||y>innerHeight-40)scrollBy(0,y-H.offsetHeight-90)}
+function toFirst(p,win){if(!p.offsetParent)return;const v=(mode==='f'&&p.querySelector('.vf'))||p.querySelector('.vd')||p,tb=v.querySelector(lay==='s'?'table.sbs':'table.diff:not(.sbs)'),c=tb&&(tb.querySelector('tr.wt')||(mode==='f'&&v.classList.contains('vf')&&tb.querySelector('tr.ad,tr.dl,tr.ch')));if(!c)return;if(p.scrollHeight>p.clientHeight){p.scrollTop+=c.getBoundingClientRect().top-p.getBoundingClientRect().top-p.querySelector('.ptool').offsetHeight-60;return}if(!win)return;const y=c.getBoundingClientRect().top;if(y<H.offsetHeight||y>innerHeight-40)scrollBy(0,y-H.offsetHeight-90)}
 function mark(b,d){if(d.o1==null&&d.n1==null)return;const o1=+(d.o1||0),o2=+(d.o2||-1),n1=+(d.n1||0),n2=+(d.n2||-1);
-b.querySelectorAll('table.diff').forEach(tb=>{const tr=[...tb.rows];let a=-1,z=-1;tr.forEach((x,i)=>{if(x.classList.contains('hk')||x.cells.length<3)return;const ov=+x.cells[0].textContent,nv=+x.cells[1].textContent;if((ov&&ov>=o1&&ov<=o2)||(nv&&nv>=n1&&nv<=n2)){if(a<0)a=i;z=i}});
+b.querySelectorAll('table.diff:not(.sbs)').forEach(tb=>{const tr=[...tb.rows];let a=-1,z=-1;tr.forEach((x,i)=>{if(x.classList.contains('hk')||x.cells.length<3)return;const ov=+x.cells[0].textContent,nv=+x.cells[1].textContent;if((ov&&ov>=o1&&ov<=o2)||(nv&&nv>=n1&&nv<=n2)){if(a<0)a=i;z=i}});
 for(let i=a;a>=0&&i<=z;i++)if(!tr[i].classList.contains('hk'))tr[i].classList.add('wt')})}
+// Split (side-by-side) layout is derived from the unified table: removals go left, additions right, paired in order.
+function toSplit(t){const s=document.createElement('table');s.className='diff sbs'+(t.classList.contains('full')?' full':'');
+s.innerHTML='<colgroup><col class="cn"><col><col class="cn"><col></colgroup>';const bd=s.createTBody();
+const code=r=>r.cells[2].innerHTML.slice(1);
+const half=(tr,num,cls,html)=>{const n=tr.insertCell();n.className='ln';n.textContent=num;const c=tr.insertCell();if(cls)c.className=cls;c.innerHTML=html};
+let dq=[],aq=[],nq=[];
+const flush=()=>{for(let i=0;i<Math.max(dq.length,aq.length);i++){const d=dq[i],a=aq[i],tr=bd.insertRow();
+tr.className='ch'+((d&&d.classList.contains('wt'))||(a&&a.classList.contains('wt'))?' wt':'');
+half(tr,d?d.cells[0].textContent:'',d?'dl':'em',d?code(d):'');half(tr,a?a.cells[1].textContent:'',a?'ad':'em',a?code(a):'')}dq=[];aq=[];
+[...new Set(nq)].forEach(h=>{const tr=bd.insertRow();tr.className='hk';const c=tr.insertCell();c.colSpan=4;c.innerHTML=h});nq=[]};
+for(const r of t.rows){if(r.classList.contains('dl')){if(aq.length)flush();dq.push(r);continue}if(r.classList.contains('ad')){aq.push(r);continue}
+const last=r.cells[r.cells.length-1];if(r.classList.contains('hk')&&last.textContent.charAt(0)==='\\'){nq.push(last.innerHTML);continue}flush();
+const tr=bd.insertRow();if(r.classList.contains('hk')){tr.className='hk';const c=tr.insertCell();c.colSpan=4;c.innerHTML=last.innerHTML;continue}
+if(r.classList.contains('wt'))tr.className='wt';half(tr,r.cells[0].textContent,'',code(r));half(tr,r.cells[1].textContent,'',code(r))}
+flush();t.after(s)}
+function ensureSplit(p){if(lay!=='s')return;p.querySelectorAll('.pbody table.diff:not(.sbs)').forEach(t=>{const n=t.nextElementSibling;if(!(n&&n.classList.contains('sbs')))toSplit(t)})}
 function setMode(m){mode=m;try{localStorage.setItem('cvz:view',m)}catch(e){}
-document.querySelectorAll('.pane').forEach(p=>{p.classList.toggle('full',m==='f');p.querySelectorAll('.seg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===m));p.scrollTop=0;toFirst(p)})}
+document.querySelectorAll('.pane').forEach(p=>{p.classList.toggle('full',m==='f');p.querySelectorAll('.seg button[data-mode]').forEach(b=>b.classList.toggle('on',b.dataset.mode===m));p.scrollTop=0;toFirst(p)})}
+function setLayout(l){lay=l;try{localStorage.setItem('cvz:layout',l)}catch(e){}
+document.querySelectorAll('.pane').forEach(p=>{p.classList.toggle('sbs',l==='s');p.querySelectorAll('.seg button[data-lay]').forEach(b=>b.classList.toggle('on',b.dataset.lay===l));ensureSplit(p);p.scrollTop=0;toFirst(p)})}
+function copyStep(b){const txt=b.dataset.copy,lbl=b.dataset.lbl||(b.dataset.lbl=b.textContent),done=ok=>{b.classList.add(ok?'ok':'err');b.textContent=ok?'✓ Copied':'Copy failed';setTimeout(()=>{b.classList.remove('ok','err');b.textContent=lbl},1500)};
+const legacy=()=>{const ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';B.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}ta.remove();done(ok)};
+if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(txt).then(()=>done(true),legacy);else legacy()}
 function select(r,quiet){const sp=r.closest('.split');reveal(r);if(!sp)return;
 sp.querySelectorAll('.list .sel').forEach(x=>x.classList.remove('sel'));r.classList.add('sel');
 const p=sp.querySelector('.pane'),b=p.querySelector('.pbody'),t=$('fv'+r.dataset.fi);
-b.textContent='';if(t)b.appendChild(t.content.cloneNode(true));mark(b,r.dataset);
+b.textContent='';if(t)b.appendChild(t.content.cloneNode(true));mark(b,r.dataset);ensureSplit(p);
 const pc=b.querySelector('input[data-pane]');if(pc){const c=document.querySelector('input[data-xp][data-q="'+pc.dataset.q+'"]');pc.checked=!!(c&&c.checked)}
 pos(p);p.scrollTop=0;toFirst(p,!quiet);
 const l=sp.querySelector('.list'),lr=l.getBoundingClientRect(),rr=r.getBoundingClientRect();
@@ -942,15 +963,28 @@ reveal(el);if(changed)scrollTo(0,0);el.scrollIntoView({block:'center'});flash(el
 function step(sp,d){if(!sp)return;const rs=rows(sp),i=rs.indexOf(sp.querySelector('.list .sel')),n=rs[i<0?0:Math.min(rs.length-1,Math.max(0,i+d))];if(n&&!n.classList.contains('sel')){select(n);history.replaceState(null,'','#'+n.id)}}
 document.addEventListener('click',ev=>{const t=ev.target;if(!t.closest)return;
 const a=t.closest('a[href^="#"]');if(a){let id=a.getAttribute('href').slice(1);try{id=decodeURIComponent(id)}catch(e){}if(go(id,true))ev.preventDefault();return}
-const tb=t.closest('.ptool button');if(tb){if(tb.dataset.mode)setMode(tb.dataset.mode);else step(tb.closest('.split'),+tb.dataset.nav);return}
+const cb=t.closest('button[data-copy]');if(cb){copyStep(cb);return}
+const tb=t.closest('.ptool button');if(tb){if(tb.dataset.mode)setMode(tb.dataset.mode);else if(tb.dataset.lay)setLayout(tb.dataset.lay);else step(tb.closest('.split'),+tb.dataset.nav);return}
 const r=t.closest('.split .list [data-fi]');
 if(r&&!t.closest('input,label,button,summary,a')&&!String(getSelection()).length){select(r);history.replaceState(null,'','#'+r.id)}});
 document.addEventListener('keydown',ev=>{if(ev.ctrlKey||ev.metaKey||ev.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName))return;const sp=cur&&cur.querySelector('.split');if(!sp)return;
-if(ev.key==='j'||ev.key==='k'){ev.preventDefault();step(sp,ev.key==='j'?1:-1)}else if(ev.key==='f'){ev.preventDefault();setMode(mode==='f'?'d':'f')}});
+if(ev.key==='j'||ev.key==='k'){ev.preventDefault();step(sp,ev.key==='j'?1:-1)}else if(ev.key==='f'){ev.preventDefault();setMode(mode==='f'?'d':'f')}else if(ev.key==='s'){ev.preventDefault();setLayout(lay==='s'?'u':'s')}});
+// Draggable divider between the list and the pane; width is a % of the split, shared by every tab and remembered.
+function setLW(px,sp,save){let v=null;if(px!=null){const w=sp.getBoundingClientRect().width;v=Math.min(Math.max(px,220),w-372)/w*100}
+if(v==null)B.style.removeProperty('--lw');else B.style.setProperty('--lw',v.toFixed(2)+'%');
+if(save)try{if(v==null)localStorage.removeItem('cvz:listw');else localStorage.setItem('cvz:listw',v.toFixed(2))}catch(e){}}
+try{const v=parseFloat(localStorage.getItem('cvz:listw'));if(v>0&&v<100)B.style.setProperty('--lw',v+'%')}catch(e){}
+document.addEventListener('pointerdown',ev=>{const g=ev.target.closest&&ev.target.closest('.split>.gut');if(!g||ev.button)return;ev.preventDefault();
+const sp=g.parentElement;g.setPointerCapture(ev.pointerId);B.classList.add('resizing');
+const mv=e=>setLW(e.clientX-sp.getBoundingClientRect().left-6,sp),up=e=>{B.classList.remove('resizing');setLW(e.clientX-sp.getBoundingClientRect().left-6,sp,true);g.removeEventListener('pointermove',mv);g.removeEventListener('pointerup',up);g.removeEventListener('pointercancel',up)};
+g.addEventListener('pointermove',mv);g.addEventListener('pointerup',up);g.addEventListener('pointercancel',up)});
+document.addEventListener('dblclick',ev=>{const g=ev.target.closest&&ev.target.closest('.split>.gut');if(g)setLW(null,g.parentElement,true)});
+document.addEventListener('keydown',ev=>{const g=ev.target.closest&&ev.target.closest('.split>.gut');if(!g||(ev.key!=='ArrowLeft'&&ev.key!=='ArrowRight'))return;ev.preventDefault();ev.stopPropagation();
+const sp=g.parentElement;setLW(sp.querySelector('.list').getBoundingClientRect().width+(ev.key==='ArrowLeft'?-24:24),sp,true)},true);
 const route=()=>{let id=location.hash.slice(1);try{id=decodeURIComponent(id)}catch(e){}if(!go(id))activate('summary')};
 addEventListener('popstate',route);
 if('scrollRestoration' in history)history.scrollRestoration='manual';
-setMode(mode);setHH();route();addEventListener('load',()=>{setHH();if(location.hash.length>1)route()});
+setMode(mode);setLayout(lay);setHH();route();addEventListener('load',()=>{setHH();if(location.hash.length>1)route()});
 window.apply=apply;window.reveal=reveal;window.go=go;window.flash=flash;
 })();`;
 
@@ -1063,11 +1097,11 @@ ${h.snip ? `<details class="hs-code"><summary>Show code${h.side === 'before' ? '
   };
   const curated = rp.some((s) => s.source === 'config');
   // Split view: list on the left, the selected file's changes on the right (rendered from <template id="fv<i>">).
-  const pane = (id) => `<div class="pane" id="${id}"><div class="ptool"><button data-nav="-1" title="Previous file (k)">◀</button><span class="ppos"></span><button data-nav="1" title="Next file (j)">▶</button><span class="seg" title="Toggle with f"><button data-mode="d" class="on">Changes</button><button data-mode="f">Full file</button></span></div><div class="pbody"><p class="cap pempty">Select a file on the left to see its changes.</p></div></div>`;
-  const split = (list, id) => (diffs ? `<div class="split"><div class="list">${list}</div>${pane(id)}</div>` : `<div class="list solo">${list}</div>`);
+  const pane = (id) => `<div class="pane" id="${id}"><div class="ptool"><button data-nav="-1" title="Previous file (k)">◀</button><span class="ppos"></span><button data-nav="1" title="Next file (j)">▶</button><span class="seg" title="Toggle with f"><button data-mode="d" class="on">Changes</button><button data-mode="f">Full file</button></span><span class="seg lay" title="Toggle with s"><button data-lay="u" class="on">Unified</button><button data-lay="s">Split</button></span></div><div class="pbody"><p class="cap pempty">Select a file on the left to see its changes.</p></div></div>`;
+  const split = (list, id) => (diffs ? `<div class="split"><div class="list">${list}</div><div class="gut" role="separator" aria-orientation="vertical" aria-label="Resize file list and details" tabindex="0" title="Drag to resize (double-click to reset)"></div>${pane(id)}</div>` : `<div class="list solo">${list}</div>`);
   const pathSection = pathOrder.length
     ? `<section class="tab" id="path"><h2>🧱 Reading path — building blocks${G(' <span class="g hs-count" id="pathCount"></span>')}</h2>
-<p class="cap">${curated ? 'Curated reading order' : 'Auto-ordered from cross-file references: each step only relies on files from earlier steps, so you meet every type before it is used. Heuristic; curate with a <code>readingPath</code> config'}. ${rp.length} steps, ${pathOrder.length} files.${diffs ? ' Select a file to see its changes; <kbd>j</kbd>/<kbd>k</kbd> move, <kbd>f</kbd> toggles the full file.' : ''}${G(' <span class="g" id="pathNext"></span>')}</p>
+<p class="cap">${curated ? 'Curated reading order' : 'Auto-ordered from cross-file references: each step only relies on files from earlier steps, so you meet every type before it is used. Heuristic; curate with a <code>readingPath</code> config'}. ${rp.length} steps, ${pathOrder.length} files.${diffs ? ' Select a file to see its changes; <kbd>j</kbd>/<kbd>k</kbd> move, <kbd>f</kbd> toggles the full file, <kbd>s</kbd> split view.' : ''}${G(' <span class="g" id="pathNext"></span>')}</p>
 ${split(rp.map((s) => {
     const a = s.files.reduce((t, f) => t + f.add, 0), d = s.files.reduce((t, f) => t + f.del, 0);
     return `<details class="pstep" id="step-${s.n}" data-n="${s.n}" data-t="${esc(s.title)}"${s.n === 1 || s.files.length <= 25 ? ' open' : ''}><summary><span class="sn">${s.n}</span> <b>${esc(s.title)}</b> <span class="kind">${s.files.length} file${s.files.length === 1 ? '' : 's'}</span> <span class="pa">+${a}</span> <span class="pd">&minus;${d}</span>${G('<span class="g pst"></span>')}</summary>${s.why ? `<p class="cap">${esc(s.why)}</p>` : ''}<ol class="pfiles">${s.files.map(pathRow).join('')}</ol></details>`;
@@ -1077,7 +1111,9 @@ ${split(rp.map((s) => {
   // Guided walkthrough: authored narrative steps; selecting one opens its file with the anchored lines highlighted.
   const wt = walkthrough || { steps: [] };
   const md = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
-  const paras = (t) => (Array.isArray(t) ? t : String(t || '').split(/\n\s*\n/)).filter((p) => String(p).trim()).map((p) => `<p>${md(p)}</p>`).join('');
+  const paraList = (t) => (Array.isArray(t) ? t : String(t || '').split(/\n\s*\n/)).map((p) => String(p).trim()).filter(Boolean);
+  const paras = (t) => paraList(t).map((p) => `<p>${md(p)}</p>`).join('');
+  const copyText = (s) => [`${s.n}. ${s.title}`, ...paraList(s.text)].join('\n\n');
   const lineLbl = (s) => (s.n1 != null ? `L${s.n1}${s.n2 !== s.n1 ? `–${s.n2}` : ''}` : s.o1 != null ? `old L${s.o1}${s.o2 !== s.o1 ? `–${s.o2}` : ''}` : '');
   const walkRow = (s) => {
     const f = s.fi != null ? files[s.fi] : null;
@@ -1086,8 +1122,8 @@ ${split(rp.map((s) => {
     return `<li class="ws${f ? '' : ' wnote'}" id="w-${s.n}"${f && diffs ? ` data-fi="${s.fi}"${rng}` : ''}><div class="wh"><span class="sn">${s.n}</span> <b>${esc(s.title)}</b></div>${where}<div class="wtx">${paras(s.text)}</div></li>`;
   };
   const walkSection = wt.steps.length
-    ? `<section class="tab" id="walk"><h2>🗺️ Guided walkthrough</h2>
-<p class="cap">The story of this change in ${wt.steps.length} steps, ordered for understanding rather than by file.${diffs ? ' Select a step to see the code it talks about, highlighted; <kbd>j</kbd>/<kbd>k</kbd> move, <kbd>f</kbd> toggles the full file.' : ''}</p>
+    ? `<section class="tab" id="walk"><h2 class="wh2">🗺️ Guided walkthrough<button class="wcopy" type="button" data-copy="${esc(wt.steps.map(copyText).join('\n\n'))}" title="Copy every step's number, title and summary (no code)">⧉ Copy steps</button></h2>
+<p class="cap">The story of this change in ${wt.steps.length} steps, ordered for understanding rather than by file.${diffs ? ' Select a step to see the code it talks about, highlighted; <kbd>j</kbd>/<kbd>k</kbd> move, <kbd>f</kbd> toggles the full file, <kbd>s</kbd> split view.' : ''}</p>
 ${split(`${wt.intro ? `<div class="wintro">${paras(wt.intro)}</div>` : ''}<ol class="wsteps">${wt.steps.map(walkRow).join('')}</ol>${wt.outro ? `<div class="wintro wout">${paras(wt.outro)}</div>` : ''}`, 'pane-walk')}</section>`
     : '';
   const walkLine = wt.steps.length ? `<p class="start wline">🗺️ <b>New to this change?</b> <a href="#w-1">Take the guided walkthrough</a> <span class="kind">${wt.steps.length} steps · ${esc(wt.steps[0].title)} → … → ${esc(wt.steps[wt.steps.length - 1].title)}</span></p>` : '';
@@ -1181,7 +1217,9 @@ nav.tabs{flex-basis:100%;display:flex;gap:2px;flex-wrap:wrap;margin:0 0 -9px}nav
 nav.tabs a:hover{color:var(--fg)}nav.tabs a.on{color:var(--fg);background:var(--bg);border-color:var(--bd);font-weight:600}nav.tabs small{font-size:11px;background:var(--bg3);border-radius:10px;padding:0 6px;margin-left:2px;color:var(--mut)}
 .flt{display:flex;gap:12px;align-items:center;flex-wrap:wrap}body:not([data-tab=path]):not([data-tab=files]) .flt{display:none}
 main{padding:12px 24px;max-width:1900px;margin:auto}section{margin-bottom:32px}section.tab{display:none}section.tab.on{display:block}section.tab>h2:first-child{margin-top:4px}
-.split{display:grid;grid-template-columns:minmax(340px,36%) minmax(0,1fr);gap:12px;align-items:start}
+.split{display:grid;grid-template-columns:clamp(220px,var(--lw,max(340px,36%)),calc(100% - 372px)) 12px minmax(0,1fr);align-items:start}
+.gut{align-self:stretch;position:relative;cursor:col-resize;touch-action:none;outline:none}.gut::after{content:'';position:absolute;top:0;bottom:0;left:5px;width:2px;border-radius:1px;background:var(--bd);transition:background .15s}
+.gut:hover::after,.gut:focus-visible::after,body.resizing .gut::after{background:var(--link)}body.resizing{cursor:col-resize;user-select:none}
 .split>.list,.split>.pane{position:sticky;top:calc(var(--hh,90px) + 8px);max-height:calc(100vh - var(--hh,90px) - 16px);overflow:auto}
 .split>.list{padding-right:4px;overflow-x:hidden}.split .fp,.ph .fp{overflow-wrap:anywhere}.split .pf,.split .card{cursor:pointer}.split .pf:hover,.split .card:hover{border-color:var(--link)}
 .pf.sel,.card.sel,.ws.sel{outline:2px solid var(--link);background:#1f6feb22}.ws[data-fi]{cursor:pointer}
@@ -1189,12 +1227,12 @@ main{padding:12px 24px;max-width:1900px;margin:auto}section{margin-bottom:32px}s
 .ptool{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;padding:6px 10px;background:var(--bg2);border-bottom:1px solid var(--bd)}
 .ptool button{padding:2px 10px;border:1px solid var(--bd);border-radius:6px;background:var(--bg3);color:var(--fg);cursor:pointer}.ptool button:disabled{opacity:.4;cursor:default}
 .ppos{font:12px monospace;color:var(--mut);min-width:60px;text-align:center}.seg{margin-left:auto;display:inline-flex}.seg button{border-radius:0}.seg button:first-child{border-radius:6px 0 0 6px}.seg button:last-child{border-radius:0 6px 6px 0;border-left:none}
-.seg button.on{background:var(--link);border-color:var(--link);color:#fff}
+.seg button.on{background:var(--link);border-color:var(--link);color:#fff}.seg.lay{margin-left:8px}
 .pempty{padding:24px}.ph{padding:8px 12px;border-bottom:1px solid var(--bd);background:var(--bg2)}.ph .fp{word-break:break-all}
 .vn{padding:6px 12px;font-size:12px}.vn0{padding:12px}.pane:not(.full) .vf,.pane:not(.full) .vn{display:none}.pane.full .pv[data-full=yes] .vd{display:none}
 kbd{font:11px monospace;border:1px solid var(--bd);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--bg3)}
 .flash{animation:pflash 1.4s ease-out}@keyframes pflash{from{background:#1f6feb66}}
-@media (max-width:1000px){.split{grid-template-columns:1fr}.split>.list,.split>.pane{position:static;max-height:none}.split>.list{max-height:42vh}}h2{border-bottom:1px solid var(--bd);padding-bottom:4px}
+@media (max-width:1000px){.split{grid-template-columns:1fr}.split>.gut{display:none}.split>.list,.split>.pane{position:static;max-height:none}.split>.list{max-height:42vh}}h2{border-bottom:1px solid var(--bd);padding-bottom:4px}
 code{background:var(--bg3);border-radius:4px;padding:0 4px}pre code{background:none;padding:0}
 .meta{color:var(--mut)}.stats{display:flex;gap:12px;flex-wrap:wrap}.stat{border:1px solid var(--bd);border-radius:8px;padding:8px 14px;min-width:100px;background:var(--bg2)}.stat b{font-size:22px;display:block}
 table.sum{border-collapse:collapse;margin-top:12px}table.sum td,table.sum th{border:1px solid var(--bd);padding:4px 10px;text-align:left}table.sum th{background:var(--bg2)}
@@ -1220,8 +1258,10 @@ pre.mermaid.merr{border:1px solid var(--delt)}.merrmsg{color:var(--delt);font-si
 pre.code{margin:0;padding:10px;overflow:auto;font:12px/1.5 Consolas,monospace;background:var(--bg)}
 .c{color:#8b949e;font-style:italic}.s{color:#a5d6ff}.k{color:#ff7b72}.t{color:#d2a8ff}.d{color:#ffa657}.n{color:#79c0ff}
 table.diff{border-collapse:collapse;width:100%;font:12px/1.45 Consolas,monospace}table.diff td{padding:0 6px;vertical-align:top;white-space:pre-wrap;word-break:break-word}
-table.diff td:nth-child(-n+2){color:var(--grey);text-align:right;width:44px;user-select:none;border-right:1px solid var(--bd)}
+table.diff:not(.sbs) td:nth-child(-n+2),table.sbs td.ln{color:var(--grey);text-align:right;width:44px;user-select:none;border-right:1px solid var(--bd)}
 tr.ad{background:var(--add)}tr.dl{background:var(--del)}tr.hk td{background:var(--hk);color:var(--mut)}
+table.sbs{table-layout:fixed;tab-size:4}table.sbs td:not(.ln){padding-left:calc(6px + 3ch);text-indent:-3ch}table.sbs col.cn{width:44px}table.sbs td.ad{background:var(--add)}table.sbs td.dl{background:var(--del)}table.sbs td.em{background:var(--bg2)}
+table.sbs td:nth-child(2){border-right:1px solid var(--bd)}.pane.sbs table.diff:not(.sbs),.pane:not(.sbs) table.sbs{display:none}
 .hidden{display:none!important}
 .card.hot{box-shadow:inset 0 0 0 1px #db6d28}.card:target{outline:2px solid var(--link)}.hot-tag{font-size:11px;border:1px solid #db6d28;background:#3d1e0a;border-radius:10px;padding:0 6px;color:#ffa657;text-decoration:none}
 ol.hotspots{padding-left:0;list-style:none;counter-reset:none}.hs{border:1px solid var(--bd);border-left:6px solid var(--delt);border-radius:6px;padding:8px 12px;margin:10px 0;background:var(--bg2)}
@@ -1241,7 +1281,7 @@ details.hs-code{margin-top:6px}details.hs-code summary{cursor:pointer;color:var(
 .pchip{font-size:11px;border:1px solid var(--bd);border-radius:10px;padding:0 6px;text-decoration:none;color:var(--fg);background:var(--bg3);font-family:monospace}.pnext{font-size:12px;margin-left:8px;text-decoration:none}
 .wline{border-left-color:var(--purp)}ol.wsteps{list-style:none;margin:0;padding:0}
 .ws{margin:8px 0;padding:8px 12px;border:1px solid var(--bd);border-left:4px solid var(--purp);border-radius:8px;background:var(--bg2)}.ws.wnote{border-left-color:var(--grey)}
-.ws .wh{display:flex;gap:8px;align-items:center}.ws .sn{background:var(--purp)}.wfile{margin:4px 0 0 32px;font-size:12px}.wfile .pjump{font-family:monospace}
+.ws .wh{display:flex;gap:8px;align-items:center}.ws .sn{background:var(--purp)}.wh2{display:flex;align-items:center;gap:8px}.wcopy{margin-left:auto;flex:none;padding:2px 10px;font-weight:normal;border:1px solid var(--bd);border-radius:6px;background:var(--bg3);color:var(--mut);cursor:pointer;font-size:12px}.wcopy:hover{color:var(--fg);border-color:var(--link)}.wcopy.ok{color:var(--addt);border-color:var(--addt)}.wcopy.err{color:var(--delt);border-color:var(--delt)}.wfile{margin:4px 0 0 32px;font-size:12px}.wfile .pjump{font-family:monospace}
 .wtx{margin-left:32px}.wtx p{margin:6px 0}.wtx code,.wintro code{font-size:12px}.ws.flash,.ws:target{outline:2px solid var(--purp)}
 .wintro{padding:6px 12px;color:var(--mut)}.wintro p{margin:6px 0}
 table.diff tr.wt td{background-image:linear-gradient(#a371f726,#a371f726)}table.diff tr.wt td:first-child{box-shadow:inset 3px 0 0 var(--purp)}

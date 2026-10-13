@@ -11,7 +11,8 @@ The brief includes:
 - **Hotspots**: the riskiest areas to read first, each with items to verify.
 - **Reading path** and an optional **guided walkthrough**: a suggested order for reading the change.
 - **Diagrams**: before/after Mermaid diagrams of the affected flow.
-- **Files**: a one-line description of each changed file, with the diff or full file shown alongside.
+- **Files**: a one-line description of each changed file, with the diff (unified or split) or full file shown
+  alongside in a pane you can widen by dragging the divider.
 - **Highlights**: the key code snippets.
 - An optional **review quest** game layer that tracks your review progress in the browser.
 
@@ -45,7 +46,7 @@ between the ticket and the code).
 ![Diagrams tab with before and after checkout flow diagrams](docs/images/diagrams.png)
 
 **Guided walkthrough**: the change told as ordered steps. Selecting a step opens the file with the relevant
-lines highlighted.
+lines highlighted. A single button copies all the steps (titles and explanations) as text.
 
 ![Walkthrough tab with a step selected and its diff lines highlighted](docs/images/walkthrough.png)
 
